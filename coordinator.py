@@ -19,6 +19,14 @@ def accueil():
 @app.post("/v1/clients")
 def inscrire_client(client: ClientInscription):
     if client.id in clients:
-        return {"erreur": "client déjà inscrit"}, 409
+        return {"erreur": "client déjà inscrit"}
     clients[client.id] = client
     return {"message": "client inscrit", "id": client.id}
+
+#suppression d un client 
+@app.delete("/v1/clients/{client_id}")
+def desinscrire_client(client_id: str):
+    if client_id not in clients:
+        return {"erreur": "client inexistant"}
+    del clients[client_id]
+    return {"message": "client désinscrit", "id": client_id}
