@@ -40,3 +40,12 @@ def desinscrire_client(client_id: str):
 @app.get("/v1/round")
 def get_round():
     return tour_actuel    
+    
+#GET /v1/round/{id}/parameters
+@app.get("/v1/round/{round_id}/parameters")
+def get_parameters(round_id: int, client_id: str):
+    if round_id != tour_actuel["id"]:
+        return {"erreur": "tour inexistant"}
+    if client_id not in tour_actuel["clients_selectionnes"]:
+        return {"erreur": "client non sélectionné"}
+    return {"modele": tour_actuel["modele"]}
