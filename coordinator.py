@@ -5,6 +5,13 @@ app = FastAPI()
 
 # Liste qui stocke les clients inscrits
 clients = {}
+# État du tour actuel
+tour_actuel = {
+    "id": 1,
+    "statut": "en_attente",
+    "modele": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "clients_selectionnes": []
+}
 
 # Modèle de données d'un client
 class ClientInscription(BaseModel):
@@ -30,3 +37,6 @@ def desinscrire_client(client_id: str):
         return {"erreur": "client inexistant"}
     del clients[client_id]
     return {"message": "client désinscrit", "id": client_id}
+@app.get("/v1/round")
+def get_round():
+    return tour_actuel    
