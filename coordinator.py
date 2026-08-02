@@ -70,4 +70,15 @@ def deposer_contribution(round_id: int, contribution: ContributionData):
     if contribution.client_id in contributions:
         return {"erreur": "contribution déjà envoyée"}, 409
     contributions[contribution.client_id] = contribution
-    return {"message": "contribution reçue", "client_id": contribution.client_id}    
+    return {"message": "contribution reçue", "client_id": contribution.client_id}  
+
+    #statistiques d avancememt et metriques experimentales
+@app.get("/v1/metrics")
+def get_metrics():
+    return {
+        "tour_id": tour_actuel["id"],
+        "statut": tour_actuel["statut"],
+        "clients_inscrits": len(clients),
+        "clients_selectionnes": len(tour_actuel["clients_selectionnes"]),
+        "contributions_recues": len(contributions)
+    }      
