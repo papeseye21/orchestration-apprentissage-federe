@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: Coordinateur d'apprentissage fédéré
+  description: API de gestion des tours d'apprentissage fédéré
+  version: 1.0.0
+
+paths:
+
+  /v1/clients:
+    post:
+      summary: Inscrire un client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: client-001
+                data_size:
+                  type: integer
+                  example: 1500
+                capacity:
+                  type: number
+                  example: 4.2
+      responses:
+        '201':
+          description: Client inscrit avec succès
+        '409':
+          description: Client déjà inscrit
+
+  /v1/clients/{id}:
+    delete:
+      summary: Désinscrire un client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Client désinscrit avec succès
+        '404':
+          description: Client inexistant
+
+  /v1/round:
+    get:
+      summary: Consulter le tour actuel
+      responses:
+        '200':
+          description: Tour actuel retourné avec succès
+
+  /v1/round/{id}/parameters:
+    get:
+      summary: Récupérer le modèle actuel
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Modèle retourné avec succès
+        '403':
+          description: Client non sélectionné
+        '404':
+          description: Tour inexistant
+
+  /v1/round/{id}/contributions:
+    post:
+      summary: Déposer une contribution
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client_id:
+                  type: string
+                  example: client-001
+                vector:
+                  type: array
+                  items:
+                    type: number
+                  example: [0.1, 0.2, 0.1, 0.3, 0.1, 0.2, 0.1, 0.2]
+                data_size:
+                  type: integer
+                  example: 1500
+                duration_s:
+                  type: number
+                  example: 0.08
+                completed:
+                  type: boolean
+                  example: true
+      responses:
+        '201':
+          description: Contribution reçue avec succès
+        '403':
+          description: Client non autorisé
+        '404':
+          description: Tour inexistant
+        '409':
+          description: Contribution déjà envoyée
+
+  /v1/metrics:
+    get:
+      summary: Voir les statistiques du tour
+      responses:
+        '200':
+          description: Métriques retournées avec succès
