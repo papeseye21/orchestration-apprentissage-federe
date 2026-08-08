@@ -6,6 +6,7 @@
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
 from strategies import StrategieS0, StrategieS1, StrategieS2, StrategieS3
+from stragglers import MecanisteM1, MecanisteM2, MecanisteM3
 
 # Création du serveur FastAPI
 app = FastAPI()
@@ -25,6 +26,9 @@ contributions = {}
 
 # Stratégie de sélection active (changeable facilement)
 strategie = StrategieS0()  # Par défaut : aléatoire
+
+# Mécanisme de gestion des stragglers actif
+mecanisme = MecanisteM1()  # Par défaut : attente complète
 
 # État du tour actuel
 tour_actuel = {
@@ -97,26 +101,33 @@ def get_round():
 @app.post("/v1/round/start")
 def demarrer_tour(response: Response):
     global tour_actuel, contributions
-    
+
     if len(clients) == 0:
         response.status_code = 400
         return {"erreur": "aucun client inscrit"}
-    
-    # Sélectionne automatiquement 10 clients avec la stratégie active
+
+    # Sélectionne automatiquement les clients avec la stratégie active
     selectionnes = strategie.selectionner(list(clients.values()), 10)
-    
+
     # Remet les contributions à zéro pour le nouveau tour
     contributions = {}
-    
+
     # Met à jour le tour actuel
+    tour_actuel["id"] += 1
     tour_actuel["statut"] = "en_cours"
     tour_actuel["clients_selectionnes"] = [c.id for c in selectionnes]
-    
+
+    # Démarre le timer pour M3
+    if hasattr(mecanisme, 'demarrer'):
+        mecanisme.demarrer()
+
     return {
         "message": "tour démarré",
         "tour_id": tour_actuel["id"],
-        "clients_selectionnes": tour_actuel["clients_selectionnes"]
+        "clients_selectionnes": tour_actuel["clients_selectionnes"],
+        "mecanisme": mecanisme.__class__.__name__
     }    
+
 
 # Récupérer le modèle actuel (seulement pour les clients sélectionnés)
 # Retourne 404 si le tour n'existe pas, 403 si client non autorisé
