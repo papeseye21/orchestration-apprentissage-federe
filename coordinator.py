@@ -5,6 +5,7 @@
 
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
+from strategies import StrategieS0, StrategieS1, StrategieS2, StrategieS3
 
 # Création du serveur FastAPI
 app = FastAPI()
@@ -21,6 +22,9 @@ clients = {}
 # Dictionnaire des contributions reçues pour le tour actuel
 # Format : {"client-001": ContributionData, ...}
 contributions = {}
+
+# Stratégie de sélection active (changeable facilement)
+strategie = StrategieS0()  # Par défaut : aléatoire
 
 # État du tour actuel
 tour_actuel = {
@@ -88,6 +92,31 @@ def desinscrire_client(client_id: str, response: Response):
 @app.get("/v1/round")
 def get_round():
     return tour_actuel
+
+# Démarrer un nouveau tour et sélectionner les clients automatiquement
+@app.post("/v1/round/start")
+def demarrer_tour(response: Response):
+    global tour_actuel, contributions
+    
+    if len(clients) == 0:
+        response.status_code = 400
+        return {"erreur": "aucun client inscrit"}
+    
+    # Sélectionne automatiquement 10 clients avec la stratégie active
+    selectionnes = strategie.selectionner(list(clients.values()), 10)
+    
+    # Remet les contributions à zéro pour le nouveau tour
+    contributions = {}
+    
+    # Met à jour le tour actuel
+    tour_actuel["statut"] = "en_cours"
+    tour_actuel["clients_selectionnes"] = [c.id for c in selectionnes]
+    
+    return {
+        "message": "tour démarré",
+        "tour_id": tour_actuel["id"],
+        "clients_selectionnes": tour_actuel["clients_selectionnes"]
+    }    
 
 # Récupérer le modèle actuel (seulement pour les clients sélectionnés)
 # Retourne 404 si le tour n'existe pas, 403 si client non autorisé
