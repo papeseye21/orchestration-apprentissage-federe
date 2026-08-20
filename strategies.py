@@ -90,4 +90,16 @@ class StrategieS3(StrategieSelection):
         nombre_aleatoires = nombre - nombre_rapides
         aleatoires = random.sample(restants, min(nombre_aleatoires, len(restants)))
         
-        return rapides + aleatoires            
+        return rapides + aleatoires           
+
+# ============================================================
+# S4 — SÉLECTION PAR RÉPUTATION
+# Privilégie les clients avec la meilleure fiabilité (reliability)
+# ============================================================
+
+class StrategieS4(StrategieSelection):
+
+    def selectionner(self, clients: list, nombre: int) -> list:
+        nombre = min(nombre, len(clients))
+        tries = sorted(clients, key=lambda c: c.reliability, reverse=True)
+        return tries[:nombre]         

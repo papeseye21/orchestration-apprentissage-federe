@@ -1,0 +1,3 @@
+strategie,duree_moyenne,contributions_moyenne,gini
+S0 (aléatoire),0.6639,9.17,0.232
+S4 (réputation),0.4718,9.93,0.9
