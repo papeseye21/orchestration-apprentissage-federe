@@ -24,7 +24,7 @@ clients = {}
 # Format : {"client-001": ContributionData, ...}
 contributions = {}
 
-# Stratégie de sélection active (changeable facilement)
+# Stratégie de sélection active 
 strategie = StrategieS0()  # Par défaut : aléatoire
 
 # Mécanisme de gestion des stragglers actif

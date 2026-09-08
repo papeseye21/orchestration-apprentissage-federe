@@ -99,3 +99,4 @@ class MecanisteM3(MecanismeStragglers):
         # Clôture si le délai est dépassé
         temps_ecoule = time.time() - self.debut_tour
         return temps_ecoule >= self.delai_max_s
+
