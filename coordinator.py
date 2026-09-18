@@ -1,3 +1,4 @@
+from __future__ import annotations
 # ============================================================
 # COORDINATEUR D'APPRENTISSAGE FÉDÉRÉ
 # Serveur HTTP (FastAPI) : clients, tours, clôture, FedAvg, métriques
@@ -71,7 +72,7 @@ def _clients_selectionnes_objets():
     return [clients[cid] for cid in tour_actuel["clients_selectionnes"] if cid in clients]
 
 
-def _cloturer_si_necessaire(temps_ecoule_s: float | None = None) -> bool:
+def _cloturer_si_necessaire(temps_ecoule_s: Optional[float] = None) -> bool:
     """
     Après chaque contribution : on demande au mécanisme si on clôture.
     Si oui → FedAvg sur les contributions completed, statut = termine.

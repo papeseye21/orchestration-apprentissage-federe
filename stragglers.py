@@ -1,3 +1,4 @@
+from __future__ import annotations
 # ============================================================
 # MÉCANISMES DE GESTION DES STRAGGLERS
 # Un straggler = un client lent qui tarde à contribuer.
@@ -16,7 +17,7 @@ class MecanismeStragglers(ABC):
         self,
         clients_selectionnes: list,
         contributions: dict,
-        temps_ecoule_s: float | None = None,
+        temps_ecoule_s: Optional[float] = None,
     ) -> bool:
         """
         Retourne True si le tour doit se clôturer, False sinon.
@@ -37,7 +38,7 @@ class MecanisteM1(MecanismeStragglers):
         self,
         clients_selectionnes: list,
         contributions: dict,
-        temps_ecoule_s: float | None = None,
+        temps_ecoule_s: Optional[float] = None,
     ) -> bool:
         return len(contributions) >= len(clients_selectionnes)
 
@@ -55,7 +56,7 @@ class MecanisteM2(MecanismeStragglers):
         self,
         clients_selectionnes: list,
         contributions: dict,
-        temps_ecoule_s: float | None = None,
+        temps_ecoule_s: Optional[float] = None,
     ) -> bool:
         if not clients_selectionnes:
             return True
@@ -84,7 +85,7 @@ class MecanisteM3(MecanismeStragglers):
         self,
         clients_selectionnes: list,
         contributions: dict,
-        temps_ecoule_s: float | None = None,
+        temps_ecoule_s: Optional[float] = None,
     ) -> bool:
         # Tout le monde est là → on peut clôturer sans attendre le délai
         if len(contributions) >= len(clients_selectionnes) and clients_selectionnes:
