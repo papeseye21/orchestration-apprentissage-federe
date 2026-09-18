@@ -1,11 +1,66 @@
 openapi: 3.0.3
 info:
   title: Coordinateur d'apprentissage fédéré
-  description: API de gestion des tours d'apprentissage fédéré
+  description: |
+    API de plan de contrôle pour tours d'apprentissage fédéré.
+    Identité client : paramètre `client_id` (query) pour GET parameters ;
+    corps JSON pour POST contributions (pas de jeton OAuth).
   version: 1.0.0
 
-paths:
+components:
+  schemas:
+    ClientInscription:
+      type: object
+      required: [id, data_size, capacity]
+      properties:
+        id:
+          type: string
+          example: client-001
+        data_size:
+          type: integer
+          minimum: 1
+          example: 1500
+        capacity:
+          type: number
+          exclusiveMinimum: 0
+          example: 4.2
+        reliability:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 1.0
+          example: 0.92
+    ContributionData:
+      type: object
+      required: [client_id, vector, data_size, duration_s, completed]
+      properties:
+        client_id:
+          type: string
+        vector:
+          type: array
+          items:
+            type: number
+          minItems: 8
+          maxItems: 8
+        data_size:
+          type: integer
+          minimum: 1
+        duration_s:
+          type: number
+          minimum: 0
+        completed:
+          type: boolean
+    Erreur:
+      type: object
+      properties:
+        erreur:
+          type: string
+        code:
+          type: string
+        tour_id:
+          type: integer
 
+paths:
   /v1/clients:
     post:
       summary: Inscrire un client
@@ -14,22 +69,16 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                id:
-                  type: string
-                  example: client-001
-                data_size:
-                  type: integer
-                  example: 1500
-                capacity:
-                  type: number
-                  example: 4.2
+              $ref: '#/components/schemas/ClientInscription'
       responses:
         '201':
-          description: Client inscrit avec succès
+          description: Client inscrit
         '409':
           description: Client déjà inscrit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
 
   /v1/clients/{id}:
     delete:
@@ -42,7 +91,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Client désinscrit avec succès
+          description: Client désinscrit
         '404':
           description: Client inexistant
 
@@ -51,11 +100,20 @@ paths:
       summary: Consulter le tour actuel
       responses:
         '200':
-          description: Tour actuel retourné avec succès
+          description: État du tour (id, statut, modèle, sélection)
+
+  /v1/round/start:
+    post:
+      summary: Démarrer un tour (sélection + ouverture des contributions)
+      responses:
+        '200':
+          description: Tour démarré
+        '400':
+          description: Aucun client inscrit
 
   /v1/round/{id}/parameters:
     get:
-      summary: Récupérer le modèle actuel
+      summary: Récupérer le modèle global
       parameters:
         - name: id
           in: path
@@ -67,17 +125,20 @@ paths:
           required: true
           schema:
             type: string
+          description: Identité déclarée du client (pas de token)
       responses:
         '200':
-          description: Modèle retourné avec succès
+          description: Modèle retourné
         '403':
           description: Client non sélectionné
         '404':
           description: Tour inexistant
+        '409':
+          description: Tour déjà clôturé
 
   /v1/round/{id}/contributions:
     post:
-      summary: Déposer une contribution
+      summary: Déposer une contribution (clôture éventuelle + FedAvg)
       parameters:
         - name: id
           in: path
@@ -89,38 +150,30 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                client_id:
-                  type: string
-                  example: client-001
-                vector:
-                  type: array
-                  items:
-                    type: number
-                  example: [0.1, 0.2, 0.1, 0.3, 0.1, 0.2, 0.1, 0.2]
-                data_size:
-                  type: integer
-                  example: 1500
-                duration_s:
-                  type: number
-                  example: 0.08
-                completed:
-                  type: boolean
-                  example: true
+              $ref: '#/components/schemas/ContributionData'
       responses:
         '201':
-          description: Contribution reçue avec succès
+          description: Contribution reçue (peut clôturer le tour)
         '403':
           description: Client non autorisé
         '404':
           description: Tour inexistant
         '409':
-          description: Contribution déjà envoyée
+          description: Tour clôturé ou contribution déjà envoyée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+              example:
+                erreur: "contribution hors délai : tour clôturé"
+                code: ROUND_CLOSED
+                tour_id: 3
 
   /v1/metrics:
     get:
-      summary: Voir les statistiques du tour
+      summary: Métriques (compteurs + Gini sur l'historique des sélections)
       responses:
         '200':
-          description: Métriques retournées avec succès
+          description: |
+            Retourne tour_id, statut, compteurs et gini_selections
+            (coefficient de Gini sur le nombre de sélections par client).

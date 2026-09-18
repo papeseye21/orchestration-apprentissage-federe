@@ -1,120 +1,111 @@
 # Plan de contrôle pour l'orchestration de tours d'apprentissage fédéré
 
 **INF1036 — Projet de recherche en informatique**  
-**Étudiant :** Abdoulaye Cissé  
+**Étudiant :** Pape Macodou Seye  
 **Session :** Été 2026
 
 ---
 
 ## Description
 
-Ce projet implémente un plan de contrôle pour l'orchestration de tours d'apprentissage fédéré. Il comprend :
+Plan de contrôle (pas d'entraînement d'un vrai réseau) : API REST, stratégies S0–S4,
+mécanismes M1–M3, évaluation croisée 12 combinaisons (100 clients, 10 sélectionnés,
+50 tours × 3 graines), approfondissement réputation (S4).
 
-- Une API REST (coordinateur) pour gérer les clients, les tours et les contributions
-- 4 stratégies de sélection des clients (S0, S1, S2, S3)
-- 3 mécanismes de gestion des stragglers (M1, M2, M3)
-- Une évaluation croisée des 12 combinaisons
-- Un approfondissement sur la réputation des clients (S4)
+Deux chemins distincts :
+- **API** (`coordinator.py`) — tours HTTP, clôture, FedAvg, Gini dans `/v1/metrics`
+- **Expérience** (`experiment.py`) — calendrier **simulé** (pas d'appel HTTP)
+
+**Docs hors rapport :** lire [`GUIDE_EXPLICATIF.md`](GUIDE_EXPLICATIF.md) (mode d’emploi du dépôt, corrections, lecture du code) et [`CHIFFRES_RAPPORT.md`](CHIFFRES_RAPPORT.md) (tableaux CSV).
 
 ---
 
-## Structure du projet
+## Structure
 
 ```
 projet-federe/
-├── federated_simulator.py      # Simulateur fourni par le prof
-├── coordinator.py              # Serveur HTTP (API REST)
-├── strategies.py               # Stratégies de sélection S0-S4
-├── stragglers.py               # Mécanismes de clôture M1-M3
-├── metrics.py                  # Coefficient de Gini
-├── experiment.py               # Évaluation croisée 12 combinaisons
-├── approfondissement.py        # Section 5 - réputation des clients
-├── openapi.yaml                # Documentation API
-├── resultats.csv               # Données brutes Section 4
-├── resultats_approfondissement.csv  # Données brutes Section 5
-└── README.md                   # Ce fichier
+├── federated_simulator.py
+├── coordinator.py
+├── strategies.py / stragglers.py / metrics.py
+├── experiment.py / approfondissement.py / plot_figures.py
+├── openapi.yaml
+├── tests/
+├── figures/                    # générées par make figures
+├── resultats.csv / resultats_bruts.csv
+├── resultats_approfondissement.csv
+├── requirements.txt / Makefile
+└── README.md
 ```
 
 ---
 
 ## Installation
 
-### Prérequis
-
-- Python 3.9+
-- pip
-
-### Installer les dépendances
+Python **3.11+** recommandé (3.9 minimum).
 
 ```bash
-pip3 install fastapi uvicorn pydantic
+python3 -m pip install -r requirements.txt
 ```
+
+Ou tout d'un coup :
+
+```bash
+make all
+```
+
+(`make all` = install + expérience + approfondissement + figures + tests)
 
 ---
 
-## Exécution
+## Reproduction des résultats
 
-### Lancer le serveur (coordinateur)
+```bash
+python3 experiment.py              # → resultats.csv + resultats_bruts.csv
+python3 approfondissement.py       # → resultats_approfondissement*.csv
+python3 plot_figures.py            # → figures/pareto_*.png
+python3 -m pytest -q
+```
+
+M3 côté expérience utilise un **délai simulé de 0,5 s** (proche du p50–p80 de S0).
+Côté API, M3 peut utiliser l'horloge réelle via `mecanisme.demarrer()`.
+
+---
+
+## Serveur HTTP
 
 ```bash
 python3 -m uvicorn coordinator:app --reload
 ```
 
-Le serveur tourne sur `http://127.0.0.1:8000`
+- API : http://127.0.0.1:8000  
+- Docs : http://127.0.0.1:8000/docs  
+- Spec versionnée : `openapi.yaml`
 
-La documentation interactive est disponible sur `http://127.0.0.1:8000/docs`
+Identité client = `client_id` (query / corps) — pas de jeton.
 
-### Lancer l'évaluation croisée (Section 4)
-
-```bash
-python3 experiment.py
-```
-
-Génère `resultats.csv` avec les 12 combinaisons.
-
-### Lancer l'approfondissement (Section 5)
-
-```bash
-python3 approfondissement.py
-```
-
-Génère `resultats_approfondissement.csv`.
-
----
-
-## Routes de l'API
-
-| Méthode | Route | Description |
+| Méthode | Route | Notes |
 |---|---|---|
-| POST | /v1/clients | Inscrire un client |
-| DELETE | /v1/clients/{id} | Désinscrire un client |
-| GET | /v1/round | Voir le tour actuel |
-| POST | /v1/round/start | Démarrer un tour |
-| GET | /v1/round/{id}/parameters | Récupérer le modèle |
-| POST | /v1/round/{id}/contributions | Déposer une contribution |
-| GET | /v1/metrics | Statistiques du tour |
+| POST | /v1/clients | `reliability` optionnel ∈ [0,1] |
+| DELETE | /v1/clients/{id} | |
+| GET | /v1/round | |
+| POST | /v1/round/start | sélection + ouverture |
+| GET | /v1/round/{id}/parameters | 409 si tour clôturé |
+| POST | /v1/round/{id}/contributions | clôture + FedAvg ; **409 hors délai** |
+| GET | /v1/metrics | compteurs + **gini_selections** |
+
+Erreur structurée : `{ "erreur", "code", "tour_id" }`.
 
 ---
 
-## Stratégies de sélection
+## Stratégies / mécanismes
 
-- **S0** — Aléatoire uniforme (référence)
-- **S1** — Proportionnelle à la taille des données
-- **S2** — Par capacité (les plus rapides)
-- **S3** — Hybride vitesse + équité (50/50)
-- **S4** — Par réputation (fiabilité)
-
-## Mécanismes de gestion des stragglers
-
-- **M1** — Attente complète (100%)
-- **M2** — Attente partielle (80%)
-- **M3** — Délai borné (5 secondes)
+- **S0** aléatoire sans remise · **S1** pondéré `data_size` sans remise  
+- **S2** capacity · **S3** hybride 50/50 · **S4** reliability  
+- **M1** attente complète · **M2** quota 80 % (arrivées ordonnées) · **M3** délai borné  
 
 ---
 
-## Versions des outils
+## Versions
 
-- Python 3.9
-- FastAPI 0.100+
-- Uvicorn 0.23+
-- Pydantic 2.0+
+- Python 3.11 (testé) / 3.9+  
+- FastAPI ≥ 0.110 · Uvicorn ≥ 0.27 · Pydantic ≥ 2 · pytest ≥ 8 · matplotlib ≥ 3.8

@@ -1,0 +1,7 @@
+strategie,repetition,graine,duree_moyenne,contributions_moyenne,gini
+S0 (aléatoire),0,0,0.633260185970907,9.32,0.23296
+S0 (aléatoire),1,1,0.7383164121484418,9.38,0.20456
+S0 (aléatoire),2,2,0.5385816014204179,9.06,0.25156
+S4 (réputation),0,0,0.46594658084475227,9.86,0.9
+S4 (réputation),1,1,0.6021592040883732,9.92,0.9
+S4 (réputation),2,2,0.3160157434316515,9.88,0.9

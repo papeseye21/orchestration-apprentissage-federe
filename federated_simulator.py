@@ -1,14 +1,13 @@
 """
-D7 - simulateur fourni pour les tours d'apprentissage fédéré.
+D7 - simulateur FOURNI pour les tours d'apprentissage fédéré.
 
-Ce fichier fournit une base neutre pour le projet D7 :
-- génération de clients hétérogènes ;
-- simulation d'un calcul local ;
-- contribution locale simplifiée ;
-- agrégation par moyenne pondérée selon la taille de données.
+À ne pas réécrire : c'est la base neutre du projet.
+Ce que ça fait, simplement :
+  - generate_clients : crée 100 clients hétérogènes (data_size, capacity, reliability)
+  - simulate_local_training : invente une durée + un vecteur dim-8 (pas un vrai NN)
+  - weighted_average : FedAvg (moyenne pondérée par data_size)
 
-Le modèle est volontairement réduit à un vecteur de nombres afin que le projet
-porte sur le plan de contrôle, et non sur l'apprentissage automatique lui-même.
+Le projet porte sur le PLAN DE CONTRÔLE (sélection / stragglers), pas sur le ML.
 """
 
 from __future__ import annotations
@@ -22,19 +21,21 @@ from typing import Iterable, List, Sequence
 
 @dataclass(frozen=True)
 class Client:
+    """Un appareil / participant du réseau fédéré."""
     id: str
-    data_size: int
-    capacity: float
-    reliability: float = 1.0
+    data_size: int          # taille du jeu de données local
+    capacity: float         # vitesse de calcul (plus grand = plus rapide)
+    reliability: float = 1.0  # proba de réussir l'entraînement local
 
 
 @dataclass(frozen=True)
 class Contribution:
+    """Résultat renvoyé par un client après l'entraînement local."""
     client_id: str
     data_size: int
-    vector: List[float]
-    duration_s: float
-    completed: bool
+    vector: List[float]     # mise à jour du modèle (dim 8)
+    duration_s: float       # durée simulée
+    completed: bool         # False = échec / contribution non utilisable
 
 
 def generate_clients(count: int = 100, seed: int | None = 42) -> list[Client]:
