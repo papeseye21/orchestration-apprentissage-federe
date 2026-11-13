@@ -1,120 +1,120 @@
-# Plan de contrôle pour l'orchestration de tours d'apprentissage fédéré
+# Orchestration de l'apprentissage fédéré : plan de contrôle
 
-**INF1036 — Projet de recherche en informatique**  
-**Étudiant :** Abdoulaye Cissé  
-**Session :** Été 2026
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-REST-009688?logo=fastapi&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-10%2F10-success)
 
----
+API REST qui orchestre des **tours d'apprentissage fédéré** (FL) et compare plusieurs
+façons de choisir les appareils participants selon trois critères : **vitesse**,
+**nombre de contributions** et **équité** (coefficient de Gini).
 
-## Description
+> Projet de recherche en informatique (INF1036) — Université du Québec à Trois-Rivières,
+> été 2026 · Auteur : **Pape Macodou Seye**
 
-Ce projet implémente un plan de contrôle pour l'orchestration de tours d'apprentissage fédéré. Il comprend :
+![Compromis entre durée d'un tour et équité](figures/pareto_duree_gini.png)
 
-- Une API REST (coordinateur) pour gérer les clients, les tours et les contributions
-- 4 stratégies de sélection des clients (S0, S1, S2, S3)
-- 3 mécanismes de gestion des stragglers (M1, M2, M3)
-- Une évaluation croisée des 12 combinaisons
-- Un approfondissement sur la réputation des clients (S4)
+## En bref
 
----
+- **API REST de 7 routes** avec FastAPI, validation Pydantic et documentation OpenAPI 3.0
+- **5 stratégies de sélection** des participants et **3 mécanismes** de gestion des
+  retardataires, interchangeables grâce au **patron Strategy** (classes abstraites Python)
+- **Évaluation de 12 combinaisons** : 100 appareils simulés, 10 sélectionnés par tour,
+  50 tours × 3 graines aléatoires
+- **Tests automatisés** (pytest, 10/10) et reproduction complète des résultats avec `make all`
 
-## Structure du projet
+## Le problème
 
-```
-projet-federe/
-├── federated_simulator.py      # Simulateur fourni par le prof
-├── coordinator.py              # Serveur HTTP (API REST)
-├── strategies.py               # Stratégies de sélection S0-S4
-├── stragglers.py               # Mécanismes de clôture M1-M3
-├── metrics.py                  # Coefficient de Gini
-├── experiment.py               # Évaluation croisée 12 combinaisons
-├── approfondissement.py        # Section 5 - réputation des clients
-├── openapi.yaml                # Documentation API
-├── resultats.csv               # Données brutes Section 4
-├── resultats_approfondissement.csv  # Données brutes Section 5
-└── README.md                   # Ce fichier
-```
+En apprentissage fédéré, le modèle est entraîné directement sur les appareils (téléphones,
+capteurs…) : seules les mises à jour du modèle sont envoyées au serveur, jamais les
+données personnelles. Le serveur doit alors décider, à chaque tour :
 
----
+1. **Qui sélectionner ?** Les appareils les plus rapides, au hasard, ceux qui ont le plus de données ?
+2. **Combien de temps attendre ?** Un appareil lent peut bloquer tout le tour.
+3. **Est-ce équitable ?** Choisir toujours les mêmes appareils biaise le modèle.
 
-## Installation
+Ce projet construit le **plan de contrôle** qui prend ces décisions et mesure leurs effets.
 
-### Prérequis
+## Résultats principaux
 
-- Python 3.9+
-- pip
+| Combinaison | Durée moyenne d'un tour | Gini (0 = équitable) | Quand l'utiliser |
+|---|---|---|---|
+| S2 + M2 | 0,113 s | 0,90 | La vitesse prime |
+| **S3 + M1** | **0,439 s** | **0,60** | **Meilleur compromis** |
+| S0 + M1 | 0,633 s | 0,25 | L'équité prime |
 
-### Installer les dépendances
+La stratégie hybride **S3** réduit l'inéquité d'un tiers par rapport à la sélection des plus
+rapides (Gini 0,60 contre 0,90), tout en restant plus rapide que la sélection aléatoire.
+Tous les chiffres sont dans [`CHIFFRES_RAPPORT.md`](CHIFFRES_RAPPORT.md) et les fichiers CSV.
 
-```bash
-pip3 install fastapi uvicorn pydantic
-```
+## Stratégies et mécanismes
 
----
+| Code | Stratégie de sélection | | Code | Gestion des retardataires |
+|---|---|---|---|---|
+| S0 | Aléatoire (référence) | | M1 | Attendre 100 % des contributions |
+| S1 | Proportionnelle au volume de données | | M2 | Clore à 80 % des contributions |
+| S2 | Les plus rapides | | M3 | Clore après un délai maximal |
+| S3 | Hybride : 5 rapides + 5 au hasard | | | |
+| S4 | Par réputation (fiabilité) | | | |
 
-## Exécution
+## Architecture
 
-### Lancer le serveur (coordinateur)
+| Fichier | Rôle |
+|---|---|
+| `coordinator.py` | API REST (FastAPI) : inscription, tours, contributions, FedAvg, métriques |
+| `strategies.py` | Stratégies de sélection S0 à S4 |
+| `stragglers.py` | Mécanismes M1 à M3 |
+| `metrics.py` | Coefficient de Gini |
+| `experiment.py` | Évaluation des 12 combinaisons (temps simulé, sans appel HTTP) |
+| `approfondissement.py` | Comparaison S0 / S4 avec tests statistiques |
+| `plot_figures.py` | Graphiques de Pareto |
+| `federated_simulator.py` | Simulateur d'appareils fourni dans le cadre du cours |
+| `tests/test_core.py` | Tests automatisés |
 
-```bash
-python3 -m uvicorn coordinator:app --reload
-```
+Ajouter une nouvelle stratégie ne demande aucune modification du coordinateur :
+il suffit de créer une sous-classe de `StrategieSelection` (principe ouvert/fermé).
 
-Le serveur tourne sur `http://127.0.0.1:8000`
+## API REST
 
-La documentation interactive est disponible sur `http://127.0.0.1:8000/docs`
-
-### Lancer l'évaluation croisée (Section 4)
-
-```bash
-python3 experiment.py
-```
-
-Génère `resultats.csv` avec les 12 combinaisons.
-
-### Lancer l'approfondissement (Section 5)
-
-```bash
-python3 approfondissement.py
-```
-
-Génère `resultats_approfondissement.csv`.
-
----
-
-## Routes de l'API
-
-| Méthode | Route | Description |
+| Méthode | Route | Rôle |
 |---|---|---|
-| POST | /v1/clients | Inscrire un client |
-| DELETE | /v1/clients/{id} | Désinscrire un client |
-| GET | /v1/round | Voir le tour actuel |
-| POST | /v1/round/start | Démarrer un tour |
-| GET | /v1/round/{id}/parameters | Récupérer le modèle |
-| POST | /v1/round/{id}/contributions | Déposer une contribution |
-| GET | /v1/metrics | Statistiques du tour |
+| POST | `/v1/clients` | Inscrire un appareil |
+| DELETE | `/v1/clients/{id}` | Désinscrire un appareil |
+| GET | `/v1/round` | État du tour en cours |
+| POST | `/v1/round/start` | Sélectionner les participants et ouvrir un tour |
+| GET | `/v1/round/{id}/parameters` | Récupérer le modèle global |
+| POST | `/v1/round/{id}/contributions` | Soumettre une contribution (clôture + FedAvg) |
+| GET | `/v1/metrics` | Compteurs et coefficient de Gini |
 
----
+Les erreurs suivent les codes HTTP standards (403, 404, 409, 422) avec un corps structuré
+`{ "erreur", "code", "tour_id" }`. Spécification complète : [`openapi.yaml`](openapi.yaml).
 
-## Stratégies de sélection
+## Lancer le projet
 
-- **S0** — Aléatoire uniforme (référence)
-- **S1** — Proportionnelle à la taille des données
-- **S2** — Par capacité (les plus rapides)
-- **S3** — Hybride vitesse + équité (50/50)
-- **S4** — Par réputation (fiabilité)
+Python 3.11 recommandé (3.9 minimum).
 
-## Mécanismes de gestion des stragglers
+```bash
+pip install -r requirements.txt
 
-- **M1** — Attente complète (100%)
-- **M2** — Attente partielle (80%)
-- **M3** — Délai borné (5 secondes)
+# Lancer l'API → documentation interactive sur http://127.0.0.1:8000/docs
+python3 -m uvicorn coordinator:app --reload
 
----
+# Reproduire tous les résultats : expériences, figures et tests
+make all
+```
 
-## Versions des outils
+Commandes séparées : `python3 experiment.py`, `python3 approfondissement.py`,
+`python3 plot_figures.py`, `python3 -m pytest -q`.
 
-- Python 3.9
-- FastAPI 0.100+
-- Uvicorn 0.23+
-- Pydantic 2.0+
+## Limites
+
+Le « modèle » est un vecteur de 8 nombres fourni par le simulateur : le projet évalue le
+plan de contrôle (sélection, attente, équité), pas la précision d'un vrai réseau de neurones.
+
+## Technologies
+
+Python · FastAPI · Pydantic · Uvicorn · pytest · matplotlib · OpenAPI 3.0 · Git
+
+## Auteur
+
+**Pape Macodou Seye** — étudiant en génie logiciel, UQTR
+[GitHub](https://github.com/papeseye21) · Pape.Macodou.Seye@uqtr.ca
