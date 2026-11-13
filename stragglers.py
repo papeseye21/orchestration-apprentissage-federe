@@ -1,102 +1,99 @@
+from __future__ import annotations
 # ============================================================
 # MÉCANISMES DE GESTION DES STRAGGLERS
-# Un straggler = un client lent qui tarde à contribuer
-# Chaque mécanisme décide quand clôturer un tour
+# Un straggler = un client lent qui tarde à contribuer.
+# Chaque mécanisme répond : « Est-ce qu'on clôture le tour maintenant ? »
 # ============================================================
 
 from abc import ABC, abstractmethod
 import time
 
-# ============================================================
-# INTERFACE COMMUNE
-# Tous les mécanismes doivent implémenter la méthode
-# attendre_contributions()
-# ============================================================
 
 class MecanismeStragglers(ABC):
+    """Contrat commun pour M1, M2, M3."""
 
     @abstractmethod
     def attendre_contributions(
         self,
         clients_selectionnes: list,
-        contributions: dict
+        contributions: dict,
+        temps_ecoule_s: Optional[float] = None,
     ) -> bool:
         """
-        Décide si le tour doit se clôturer
-        - clients_selectionnes : liste des clients choisis
-        - contributions : dictionnaire des contributions reçues
-        - retourne : True si on clôture, False si on attend encore
+        Retourne True si le tour doit se clôturer, False sinon.
+
+        - clients_selectionnes : clients choisis pour ce tour
+        - contributions : {client_id: contribution} déjà reçues
+        - temps_ecoule_s :
+            * fourni en expérience (= duration_s du dernier arrivé) → horloge simulée
+            * None côté API → M3 utilisera time.time()
         """
         pass
 
 
-# ============================================================
-# M1 — ATTENTE COMPLÈTE
-# Le tour attend TOUTES les contributions
-# Avantage : résultat complet
-# Inconvénient : un seul lent bloque tout le monde
-# ============================================================
-
 class MecanisteM1(MecanismeStragglers):
+    """Attente complète : on n'arrête que quand tout le monde a répondu."""
 
     def attendre_contributions(
         self,
         clients_selectionnes: list,
-        contributions: dict
+        contributions: dict,
+        temps_ecoule_s: Optional[float] = None,
     ) -> bool:
-        # On clôture seulement si TOUS les clients ont contribué
         return len(contributions) >= len(clients_selectionnes)
 
 
-# ============================================================
-# M2 — ATTENTE PARTIELLE
-# Le tour se clôt dès qu'un quota est atteint (ex: 80%)
-# Avantage : plus rapide
-# Inconvénient : on perd des contributions
-# ============================================================
-
 class MecanisteM2(MecanismeStragglers):
+    """
+    Quota partiel (défaut 80 %) : dès que assez de monde est arrivé, on coupe.
+    En expérience, les arrivées sont triées par durée → on exclut les plus lents.
+    """
 
     def __init__(self, quota: float = 0.8):
-        # quota = proportion minimale de contributions requises
-        # 0.8 = 80% des clients sélectionnés doivent contribuer
-        self.quota = quota
+        self.quota = quota  # ex. 0.8 → 8 clients sur 10 suffisent
 
     def attendre_contributions(
         self,
         clients_selectionnes: list,
-        contributions: dict
+        contributions: dict,
+        temps_ecoule_s: Optional[float] = None,
     ) -> bool:
+        if not clients_selectionnes:
+            return True
         minimum = len(clients_selectionnes) * self.quota
         return len(contributions) >= minimum
 
 
-# ============================================================
-# M3 — DÉLAI BORNÉ
-# Le tour se clôt après un délai maximal
-# Avantage : durée prévisible
-# Inconvénient : les lents sont toujours exclus
-# ============================================================
-
 class MecanisteM3(MecanismeStragglers):
+    """
+    Délai borné : on clôture si le temps dépasse delai_max_s
+    (ou si tout le monde a déjà répondu).
+
+    - Expérience : passer temps_ecoule_s (souvent 0,5 s de délai max)
+    - API : appeler demarrer() au début du tour, puis laisser temps_ecoule_s=None
+    """
 
     def __init__(self, delai_max_s: float = 5.0):
-        # delai_max_s = durée maximale du tour en secondes
         self.delai_max_s = delai_max_s
-        self.debut_tour = None
+        self.debut_tour = None  # horloge murale (API)
 
     def demarrer(self):
-        # Enregistre l'heure de début du tour
+        """À appeler au POST /v1/round/start (chemin API seulement)."""
         self.debut_tour = time.time()
 
     def attendre_contributions(
         self,
         clients_selectionnes: list,
-        contributions: dict
+        contributions: dict,
+        temps_ecoule_s: Optional[float] = None,
     ) -> bool:
+        # Tout le monde est là → on peut clôturer sans attendre le délai
+        if len(contributions) >= len(clients_selectionnes) and clients_selectionnes:
+            return True
+        # Chemin expérience : compare au calendrier simulé
+        if temps_ecoule_s is not None:
+            return temps_ecoule_s >= self.delai_max_s
+        # Chemin API : compare à l'horloge réelle
         if self.debut_tour is None:
             return False
-        # Clôture si le délai est dépassé
-        temps_ecoule = time.time() - self.debut_tour
-        return temps_ecoule >= self.delai_max_s
-
+        return (time.time() - self.debut_tour) >= self.delai_max_s
